@@ -1,7 +1,6 @@
 import click
 import os
 import subprocess
-import shlex
 
 from urllib.parse import urlparse, parse_qs
 
@@ -10,17 +9,24 @@ from utils import ensure_folder, subfolders
 
 
 def create_runnable(query, output=None, archive=None):
-	state = config.YOUTUBE_BIN
+	runnable = [config.YOUTUBE_BIN]
+
+	if config.YOUTUBE_CFG is not None:
+		runnable.append('--config-location')
+		runnable.append(os.path.abspath(config.YOUTUBE_CFG))
 
 	if output is not None:
-		state += ' --output "{}"'.format(output)
+		runnable.append('--output')
+		runnable.append(os.path.abspath(output))
+
 	if archive is not None:
-		state += ' --download-archive "{}"'.format(archive)
+		runnable.append('--download-archive')
+		runnable.append(os.path.abspath(archive))
 
 	for subquery in query:
-		state += ' "{}"'.format(subquery)
+		runnable.append(subquery)
 
-	return state
+	return runnable
 
 
 def update_channels():
@@ -44,7 +50,7 @@ def update_channels():
 		archive=os.path.join(channels_folder, 'archive')
 	)
 
-	subprocess.run(runnable, shell=True)
+	subprocess.call(runnable)
 
 
 def update_playlists():
@@ -55,7 +61,7 @@ def update_playlists():
 
 	# loop through it, formatting the url and just invoking the playlist cli command
 	for folder in subfolders(playlists_folder):
-		playlist(('https://www.youtube.com/playlist?list={}'.format(folder),))
+		playlist_meta('https://www.youtube.com/playlist?list={}'.format(folder))
 
 
 @click.group(invoke_without_command=True)
@@ -82,14 +88,16 @@ def channel(query):
 		output=os.path.join(channels_folder, '%(uploader_id)s', config.CHANNEL_FORMAT))  # set full output format
 
 	# run youtube-dl
-	subprocess.run(runnable, shell=True)
+	subprocess.call(runnable)
 
 
 @cli.command()
 @click.argument('playlist_url')
 def playlist(playlist_url):
-	print(playlist_url)
+	playlist_meta(playlist_url)
 
+
+def playlist_meta(playlist_url):
 	# try parsing the playlist url
 	try:
 		parsed = urlparse(playlist_url)
@@ -120,7 +128,7 @@ def playlist(playlist_url):
 		output=os.path.join(output_folder, config.PLAYLIST_FORMAT),
 		archive=os.path.join(output_folder, 'archive'))
 
-	subprocess.run(runnable, shell=True)
+	subprocess.call(runnable)
 
 
 @cli.command()
@@ -146,7 +154,7 @@ def group(group_name, query):
 		archive=archive,
 		output=os.path.join(group_folder, config.GROUP_FORMAT))
 
-	subprocess.run(runnable, shell=True)
+	subprocess.call(runnable)
 
 
 if __name__ == '__main__':
